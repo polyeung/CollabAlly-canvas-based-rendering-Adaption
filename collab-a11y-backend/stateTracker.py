@@ -17,10 +17,10 @@ import webcolors
 from webcolors import css3_hex_to_names, hex_to_rgb
 
 # Google Application Credentials: Please change this to your own credential file
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "REMOVED_FOR_SECURITY"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "./cosmic-envoy-373202-dc47ea48f0e0.json"
 
 # CollabAlly Default document link: Please make sure it's ended with 'mobilebasic', which is the link you will get if you open the document via your mobile devices
-doc_url = "PLEASE_CHANGE_TO_YOUR_DOC_LINK"
+doc_url = "https://docs.google.com/document/d/1O2obIxuYMg8MwhYbaaU7k1GhT6js5f2-p4FsJK98rxA/edit"
 
 
 # See https://github.com/google/diff-match-patch/wiki/Language:-Python
@@ -358,13 +358,19 @@ def synthesize_text(text, path):
 ########################################################################################
 ### URL EXTRACTION UTILITY FUNCTIONS
 ########################################################################################
+# TODO: Fix this, div is not found after requests.get, but 200 OK
 def getURLString(url):
     req = requests.get(url, headers)
     gdoc_website = BeautifulSoup(req.content, 'html.parser').find('div', class_='doc')
-    gdoc_div = gdoc_website.find('div')
-    gdoc_content = gdoc_div.findAll(['p', 'ol', 'ul', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
-    data = [str(x) for x in gdoc_content]
-    return ''.join(data)
+    #print("Testing....")
+    #print(req.text)
+    
+    ## disable this for none error
+    # gdoc_div = gdoc_website.find('div')
+    # gdoc_content = gdoc_div.findAll(['p', 'ol', 'ul', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+    # data = [str(x) for x in gdoc_content]
+    #return ''.join(data)
+    return ''
 
 def getURLHTML(url):
     req = requests.get(url, headers)

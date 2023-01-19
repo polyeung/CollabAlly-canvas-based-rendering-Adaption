@@ -1,7 +1,10 @@
-from flask import Flask, request, render_template, send_file
+from flask import Flask, request, render_template, send_file, jsonify
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS, cross_origin
 from datetime import datetime
+# library for google authentication
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
 import os
 import json
 import itertools
@@ -21,12 +24,21 @@ from google.cloud import texttospeech
 
 from stateTracker import *
 
+###########custom importing ###########
+import googleapiclient.discovery as discovery
+from httplib2 import Http
+from oauth2client import client
+from oauth2client import file
+from oauth2client import tools
+
+
+
 # Google Application Credentials: Please change this to your own credential file
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "REMOVED_FOR_SECURITY"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "./cosmic-envoy-373202-dc47ea48f0e0.json"
 
 loop = asyncio.get_event_loop()
 app = Flask(__name__, template_folder='../')
-host_url = "10.0.0.191"
+host_url = "100.64.3.100"
 # host_url = "0.0.0.0"
 airpodJSON = {}
 
@@ -49,11 +61,99 @@ mongo = PyMongo(app)
 def hello_world():
     return 'Hello, World!'
 
+
+creds = Credentials.from_authorized_user_info(info={
+    'client_id': '740364424889-t63umacf2cevj650bpo3jhhslgrk0n7i.apps.googleusercontent.com',
+    'client_secret': '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',
+    'scope': 'https://www.googleapis.com/auth/documents',
+    'refresh_token': 'REFRESH_TOKEN',
+    'token_uri': 'https://oauth2.googleapis.com/token'
+})
+#########################################################
+##### added function for testing with google doc api ####
+#########################################################
+@app.route('/document/')
+def get_api():
+    """Uses the Docs API to print out the text of a document."""
+    credentials = get_credentials()
+    http = credentials.authorize(Http())
+    docs_service = discovery.build(
+        'docs', 'v1', http=http, discoveryServiceUrl=DISCOVERY_DOC)
+    doc = docs_service.documents().get(documentId=DOCUMENT_ID).execute()
+    doc_content = doc.get('body').get('content')
+    print(read_structural_elements(doc_content))
+
+
+SCOPES = 'https://www.googleapis.com/auth/documents.readonly'
+DISCOVERY_DOC = 'https://docs.googleapis.com/$discovery/rest?version=v1'
+DOCUMENT_ID = '15m_x1PDQwDizhNghey478AJzn61RNEI3cT-nv4rRwcE'
+
+
+def get_credentials():
+    """Gets valid user credentials from storage.
+
+    If nothing has been stored, or if the stored credentials are invalid,
+    the OAuth 2.0 flow is completed to obtain the new credentials.
+
+    Returns:
+        Credentials, the obtained credential.
+    """
+    store = file.Storage('token.json')
+    credentials = store.get()
+
+    if not credentials or credentials.invalid:
+        flow = client.flow_from_clientsecrets('credentials.json', SCOPES)
+        credentials = tools.run_flow(flow, store)
+    return credentials
+
+def read_paragraph_element(element):
+    """Returns the text in the given ParagraphElement.
+
+        Args:
+            element: a ParagraphElement from a Google Doc.
+    """
+    text_run = element.get('textRun')
+    if not text_run:
+        return ''
+    return text_run.get('content')
+
+
+
+def read_structural_elements(elements):
+    """Recurses through a list of Structural Elements to read a document's text where text may be
+        in nested elements.
+
+        Args:
+            elements: a list of Structural Elements.
+    """
+    text = ''
+    for value in elements:
+        if 'paragraph' in value:
+            elements = value.get('paragraph').get('elements')
+            for elem in elements:
+                text += read_paragraph_element(elem)
+        elif 'table' in value:
+            # The text in table cells are in nested Structural Elements and tables may be
+            # nested.
+            table = value.get('table')
+            for row in table.get('tableRows'):
+                cells = row.get('tableCells')
+                for cell in cells:
+                    text += read_structural_elements(cell.get('content'))
+        elif 'tableOfContents' in value:
+            # The text in the TOC is also in a Structural Element.
+            toc = value.get('tableOfContents')
+            text += read_structural_elements(toc.get('content'))
+    return text
+    
+
+    #### custom code  end ########
+    
 @app.route('/text_to_speech', methods=['POST'])
 def handle_text_to_speech():
     # text_change, tts = fetch_updated_diff(request.json["page_info"], request.json["collaborators"], "")
     text_change = fetch_updated_diff(request.json["page_info"], request.json["collaborators"], "")
-    print("Sending updated text: ", text_change)
+    # print("Sending updated text: ", text_change)
 
     # COLLAB CHANGES
     update_log("timestamp", datetime.now().strftime("%Y%m%d%H%M%S"))
@@ -108,9 +208,9 @@ def handle_get_audio():
     filename = request.args.get('name')
     print("Fetching audio file: ./media/{}".format(filename))
     try:
-	    return send_file('./media/{}'.format(filename), attachment_filename = filename)
+        return send_file('./media/{}'.format(filename), attachment_filename = filename)
     except Exception as e:
-	    return str(e)
+        return str(e)
 
 # Update: we are not handling unread comments (i.e. no point to read a deleted/resolved comment)
 # TODO: See whether there is a use case to add a "dummy" entry

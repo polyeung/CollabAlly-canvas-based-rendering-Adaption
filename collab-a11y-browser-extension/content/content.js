@@ -3,10 +3,12 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 // WARNING: You should change the host_ipv4 to your own web service IP address where you host
 // the backend server!!
-const host_ipv4= "https://collabally.humanailab.com:443"
+const host_ipv4= "http://100.64.3.100:5000"
 var socket;
 var socketReady = false;
 var TTSPlaying = false;
+
+
 
 // Initialize the comparison procedure
 function initializeComparison() {
@@ -62,22 +64,52 @@ let voiceFontMap = {
 var docHTMLElementMap = [];
 var docHTMLContextJSON = [];
 
+//////////////////////////
+//// My added function ///
+//////////////////////////
+
+// use the google doc api to access the page and get the contents
+function get_with_api(){
+    console.log("using google doc api .......")
+    gapi.load('client', () => {
+        gapi.client.init({
+            apiKey: 'AIzaSyAfOVSnCS9a8Yo6NGLOFan86pBM8sdn82M',
+            clientId:'740364424889-t63umacf2cevj650bpo3jhhslgrk0n7i.apps.googleusercontent.com',
+            discoveryDocs: ['https://docs.googleapis.com/$discovery/rest?version=v1'],
+            scope: 'https://www.googleapis.com/auth/documents'
+        }).then(() => {
+            // Use the gapi.client.docs to access the Google Docs API
+            gapi.client.docs.documents.get({
+                documentId: '15m_x1PDQwDizhNghey478AJzn61RNEI3cT-nv4rRwcE'
+            }).then(res => {
+                console.log(res.result);
+            });
+        });
+    });
+}
 /**
  * Helper function to get the most updated version of the HTML document by tracking the document state
  */
 function getUpdatedDoc() {
     // All the pages for the google doc
+    console.log("getUpdatedDoc.....");
+    get_with_api();
     docHTMLElementMap.splice(0, docHTMLElementMap.length);
     docHTMLContextJSON.splice(0, docHTMLContextJSON.length);
     // var doc_pages = document.getElementsByClassName("kix-page kix-page-header-clip-enabled docs-page docs-page-portrait kix-page-paginated");
+    //this can work // 
     var doc_pages = document.getElementsByClassName("kix-page-paginated");
+    //testing code....
+
 
     // For each page, get the spans in each page
     for (let i = 0; i < doc_pages.length; i++) {
         // console.log("Page number ", i, " with elements: ", doc_pages[i]);
         docHTMLElementMap.push({top: $(doc_pages[i]).offset().top, text: []});
         docHTMLContextJSON[i] = [];
-
+    
+        //TODO: this one is not working, don'tknow how to chang, needs to get the span element
+        // this one is really tricky , it's empty then break many functions after this
         var page_text = doc_pages[i].getElementsByClassName("kix-wordhtmlgenerator-word-node");
         for (let j = 0; j < page_text.length; j++) {
             let elementObj = {
@@ -91,7 +123,7 @@ function getUpdatedDoc() {
         }
     }
 
-    // console.log("Final State: ", docHTMLElementMap);
+    console.log("Final State: ", docHTMLElementMap);
 }
 
 // Find the element on the cursor based on Y Offset
@@ -101,6 +133,7 @@ function getUpdatedDoc() {
  * @returns JSON object describing which element the cursor is located on
  */
 function findCursorElement(cursorYOffset) {
+    console.log("findCursorElement function.....");
     // Going backwards
     // console.log("Cursor top position: ", cursorYOffset);
     for (var i = docHTMLElementMap.length - 1; i >= 0; i--) {
@@ -125,26 +158,36 @@ function findCursorElement(cursorYOffset) {
  * @returns The object based representation of the collaborator states
  */
 function getCollabStates(url) {
+    console.log("getCollabStates(url) function.....")
     if (url.indexOf("https://docs.google.com") != -1) {
         // First update the doc state to track where all the elements are
         getUpdatedDoc();
 
         // Get the width of the document and determine the ratio for it
-        var docWidth = document.getElementsByClassName("kix-zoomdocumentplugin-outer")[0];
+        //== not work == //
+        //change to this
+        // old version : var docWidth = document.getElementsByClassName("kix-zoomdocumentplugin-outer")[0];
+        var docWidth = document.getElementsByClassName("kix-page-paginated")[0];
+        //== worked! == //
         var docHeight = document.getElementsByClassName("kix-page-paginated")[0];
 
+        console.log("changes saved 1");
         // And then fetch all the cursors and their positions in the doc
+        // == worked! == //
         var collaborator_cursors = document.getElementsByClassName("kix-cursor docs-ui-unprintable");
         var collaborator_names = [];
         var collaborator_levels = {};
 
         for (var i = 0; i < collaborator_cursors.length; i++) {
             var cursor_name = collaborator_cursors[i].getElementsByClassName("kix-cursor-name")[0].innerText;
-            
+            console.log("cursor name : ", cursor_name);
             if (cursor_name === "") 
                 cursor_name = "Self";
-
+            
+            //this code is probably not workling !!!!!!!
             var element = findCursorElement($(collaborator_cursors[i]).offset().top);
+            console.log("parameter: ", $(collaborator_cursors[i]).offset().top);
+            console.log("return element: ", element);
             if ("element" in element) {
                 collaborator_levels[cursor_name] = {
                     // "pos": {"x": ($(collaborator_cursors[i]).offset().left - docWidth.offsetLeft)/docWidth.clientWidth, 
@@ -157,13 +200,16 @@ function getCollabStates(url) {
                     "text": element.element.innerText
                 }
 
+                console.log("x : ", (parseFloat($(collaborator_cursors[i]).css("left")) - docWidth.offsetLeft)/docWidth.clientWidth);
+                console.log("y : ", (parseFloat($(collaborator_cursors[i]).css("top")) - docWidth.offsetTop)/docHeight.clientHeight);
+
                 if (cursor_name === "Self") {
                     selfCursorPos = collaborator_levels["Self"]["pos"];
                 }
             }
             // console.log(collaborator_levels);
         }
-
+        console.log("testing coolaborator_levels: ", collaborator_levels);
         for (var i = 0; i < collaborator_levels.length; i++) {
             for (var j = 0; j < collaborator_levels.length; j++) {
                 if (i !== j) {
