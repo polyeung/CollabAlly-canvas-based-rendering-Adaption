@@ -1,57 +1,144 @@
-# CollabAlly
+# CollabAlly Project Report
+
+Adapt CollabAlly with canvas-based rendering
+Yang Li
+University of Michigan, CoE, CS
+
+### Introduction
 
 CollabAlly is a system that makes collaboration awareness in document editing accessible to blind users. CollabAlly extracts collaborator, comment, and text-change information and their context from a document and presents them in a dialog box to provide easy access and navigation.
 
-Check the sub-folders for more information and source codes!
+### Problem
 
-### Current Feature Overview
+Google recently changed google doc from html-base rendering to canvas-base rendering. Since canvas-based rendering fills up <canvas> element with javascript, the traditional method the past researchers implemented is not working well right now. The past method including obtaining text element through dom tree is restricted by canvas-based rendering feature. Therefore, some adjustments to our codes are needed to adapt this.
 
-1. Use of distinct earcons that indicate when and where the following collaboration activities occur in the document:
-   1. When a collaborator has entered and exited the document. In the current state of CollabAlly, exiting the document and being idle in the document are considered identical and thereby treated as such.
-   2. When a collaborator has added or removed a comment. In the current state of CollabAlly, deleting a comment and resolving a comment are considered identical and thereby treated as such.
-   3. When a collaborator's cursor has moved within 5 lines from the user's cursor, or moved away from the user's cursor after entering within 5 lines.
-2. A dialog box that can be accessed through a finite set of pre-defined keyboard shortcuts, that provide comprehensive information about different collaborator activities since the user entered the document and/or last opened the dialog box. Information varies based on the type of collaboration activity, as follows:
-   1. Collaborator Changes:
-      1. Collaborator Name
-      2. Location of Collaborator's Cursor (page number and location on page (top, center, bottom))
-      3. Line of text that the Collaborator's Cursor is on in the document
-   2. Comment Changes:
-      1. Name of Comment Author
-      2. Location of Selected Text for Comment (page number and location on page (top, center, bottom))
-      3. Selected text that the Comment is referring to
-      4. Date Comment was made
-      5. Content of Comment itself
-   3. Text and Style Changes:
-      1. 
-3. For detailed information about each collaborator activities, CollabAlly provides Text-To-Speech (TTS) features to have the information read aloud in the Voicefont that was defined by the collaborators themselves. For demo and implementation purposes, this has been predefined in the code. 
-4. Use of spatial audio techniques to pan earcons and TTS audio in a certain direction based on whether the corresponding change was made above the user's cursor, or below the user's cursor. Directionality can be modified in a separate settings menu, but defaults to Left to Right (pans left if change is below the user's cursor, right if change is above the user's cursor).
-5. A backend system to maintain persistent information of the state of the Google Document after the user exits the document. Upon re-entering the document, CollabAlly fetches the stored state and compares it with the most recent version of the document, thereby offering 
+### Analysis of Codes
 
-### Immediate Features to Implement
+Chrome extension part
 
-1. Fixing heading hierarchy, information architecture, and phrasing of certain types of changes of dialog box based on user feedback from evaluative user research.
-2. Debugging and fixing reliability issues with backend system for parsing text and style changes.
-3. Checking and verifying spatial audio panning issues that sometimes occur with TTS audio
-4. Resolving issues with incorrect page numbering for comments when additional text is added on the last page of the document (specficially when it is added in a bulleted list)
+- background.js
+    - listener 1
+        - triggered by Shift+Alt+0
+        - construct connection with backend api through socket
+    - listener 2
+        - triggered by Shift+Alt+1
+        - display content.js in tab for user
+    - listener 3
+        - triggered by Shift+Alt+2
+        - display setting windows to users
+    - listener 4
+        - triggered by TODO
+        - get collaborators in current pages
+- content.js
+    - findLCA()
+        - find the lowest common ancestors in dom tree for two targets
+        - mainly used for find what component two cursors are both on
+    
+    - getUpdatedDoc()
+        - get the large page element with
+        
+        ```cpp
+        var doc_pages = document.getElementsByClassName("kix-page-paginated");
+        ```
+        
+        - then get the span for each page ⇒ get the text on google doc
+        - push every text to docHTMLContextJSON dictionary
+        - push every text object along with coordinates of this text to docHTMLElementMap
+        
+    - findCursorElement(cursorYOffset)
+        - for every text context we found previously, check whether the distance between the cursorYOffset and the position of that text is within 5
+        - if so, then return the corresponding text element/object as well as page index, this indicates that the cursor is hovered on that text
+    
+    - getCollabStates(url)
+        - call getUpdatedDoc to obtain updated version of google docs and store to data structure
+        - get all collaborator_cursors with following:
+        
+        ```cpp
+        var cursor_name = collaborator_cursors[i].getElementsByClassName("kix-cursor-name")[0].innerText;
+        ```
+        
+        - then for every cursor , we can read the position of it
+        - and store following info to dictionary
+        
+        ```cpp
+        {
+        "pos" : ,
+        "element": ,
+        "page": ,
+        "context": ,
+        "text": ,
+        }
+        ```
+        
+        - return all info in collaborator_levels dictionary
+    
+    - compareMaps(map1, map2)
+        - this function compare two maps,(old state: map1, new state: map2)
+        - get onlineCollabs with following
+        
+        ```cpp
+        let onlineCollabs = document.getElementsByClassName("docs-presence-plus-collab-widget-container goog-inline-block docs-presence-plus-collab-widget-focus");
+        ```
+        
+        - if there are same user and with different position now, push the new position info to movedCollaborators dictionary
+        - else ⇒ we push this idle users to idleCollaborators dictionary
+        - also filter out the new collaborators and push to newCollaborators dictionary
+        - return different updated dictionary
+        
+    - getContext(levels)
+        - the input levels parameter is generated from getCollabStates(url)
+    
+    - getCollabComments(url)
+        - Get comment Div elements
+        - Get highlighted text element
+        - get the textBlock, author, timestamp, commentText for each commentDiv
+        - store the info into dictionary and return
+    
+    - getCommentLocation(docText)
+        - loop through docHTMLContextJSON and check each text
+        - if the text match, calculate the position ratio in that page and determine whether it’s in bottom/top/center
+        - return the result with location info
 
-### Long Term Features to Incorporate
+### Detailed Analysis
 
-1. Developing a more comprehensive earcon system of distinguishing:
-   1. Collaborators leaving vs. Collaborators that are idle
-   2. Deleting comments vs resolving Comments
-2. Providing real-time earcon feedback for any collaboration activity anywhere in the document (currently only limited to the changes that are visible within the user's viewport)
-3. Offering more contextual information about the text changes and style changes that have been added, such as:
-   1. The type of text that is being edited (heading, sentence, paragraph, list, table)
-   2. Mapping CSS changes to understandable style changes (size of text increased, color changed, font was bolded, etc.)
-   3. Support for more types of changes (e.g. images, tables, charts, footnotes)
-4. Providing more scalable options for multiple collaborators using CollabAlly simultaneously in same document.
-5. Providing more support for sighted users to use CollabAlly
-6. Extending features and support of CollabAlly beyond Google Docs (e.g. Overleaf)
+Codes that can not work
 
-### Features to be Integrated with existing Tools
+- Get the class of highlighted text elements
 
-Many of the limitations of CollabAlly stem from lack of direct access to Google Docs, Chrome and/or Screenreader code. To enhance support, the following integrations are necessary.
+```cpp
+let highlightedDiv = document.getElementsByClassName("kix-htmloverlay docs-ui-unprintable kix-htmloverlay-under-text");
+```
 
-1. Direct mapping of voicefonts to screenreader vocalizer features, to directly read out collaborator changes in the accent and gender of the voice that the collaborator chooses. 
-2. Using spatial audio/panning features built into screenreaders that allow more distinct spatial audio changes to audio
-3. Direct access to Google Docs API to access text changes and states in the document (i.e. version control information)
+- Get the doc height
+
+```cpp
+const docHeight = document.getElementsByClassName("kix-page-paginated")[0];
+```
+
+Codes that can work
+
+- Get collaborators in google doc
+
+```cpp
+let onlineCollabs = document.getElementsByClassName("docs-presence-plus-collab-widget-container goog-inline-block docs-presence-plus-collab-widget-focus");
+```
+
+- Get the name of collaborators
+
+```cpp
+let collab_name = collab.getAttribute("aria-label");
+```
+
+- Get the comment div element
+
+```cpp
+let commentDiv = document.getElementsByClassName("docos-docoview-tesla-conflict docos-docoview-resolve-button-visible docos-anchoreddocoview");
+```
+
+- Get closest comment
+
+```cpp
+let closestCommentBlock = comment.getElementsByClassName("docos-anchoreddocoview-content docos-docoview-replycontainer")[0];
+```
+
+### Potential Solution
