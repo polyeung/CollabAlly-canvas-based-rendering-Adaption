@@ -99,6 +99,8 @@ Chrome extension part
         - if the text match, calculate the position ratio in that page and determine whether it’s in bottom/top/center
         - return the result with location info
 
+---
+
 ### Detailed Analysis
 
 Codes that can not work
@@ -113,6 +115,12 @@ let highlightedDiv = document.getElementsByClassName("kix-htmloverlay docs-ui-un
 
 ```cpp
 const docHeight = document.getElementsByClassName("kix-page-paginated")[0];
+```
+
+- Get the text on pages
+
+```cpp
+var page_text = doc_pages[i].getElementsByClassName("kix-wordhtmlgenerator-word-node");
 ```
 
 Codes that can work
@@ -141,4 +149,132 @@ let commentDiv = document.getElementsByClassName("docos-docoview-tesla-conflict 
 let closestCommentBlock = comment.getElementsByClassName("docos-anchoreddocoview-content docos-docoview-replycontainer")[0];
 ```
 
+- Get the pages div
+
+```cpp
+var doc_pages = document.getElementsByClassName("kix-page-paginated");
+```
+
+- Get the width of page
+
+```cpp
+var docWidth = document.getElementsByClassName("kix-page-paginated")[0];
+```
+
+- Get the cursor element
+
+```cpp
+var collaborator_cursors = document.getElementsByClassName("kix-cursor docs-ui-unprintable");
+```
+
+- Get the name of cursor (collaborators’ name)
+
+```cpp
+var cursor_name = collaborator_cursors[i].getElementsByClassName("kix-cursor-name")
+```
+
 ### Potential Solution
+
+- Right now, since the google doc uses canvas-based rendering, we are not able to select the texts through “span” elements anymore. In fact, we can no longer use these approaches by obtaining text information in dom tree. (See canvas elements below)
+
+![Untitled](CollabAlly%20Project%20Report%2023f505c1b5a646178e3e265be1973d47/Untitled.png)
+
+- Fortunately,  we can use google doc api to crawl the text information within canvas element, we can also obtain their position in doc as well, here is the code demo below:
+
+```python
+from __future__ import print_function
+
+import os.path
+
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
+# If modifying these scopes, delete the file token.json.
+SCOPES = ['https://www.googleapis.com/auth/documents.readonly']
+
+# The ID of a sample document.
+DOCUMENT_ID = '15m_x1PDQwDizhNghey478AJzn61RNEI3cT-nv4rRwcE'
+
+def main():
+    """Shows basic usage of the Docs API.
+    Prints the title of a sample document.
+    """
+    creds = None
+    # The file token.json stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time.
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    # If there are no (valid) credentials available, let the user log in.
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                'credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        # Save the credentials for the next run
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
+
+    try:
+        service = build('docs', 'v1', credentials=creds)
+
+        # Retrieve the documents contents from the Docs service.
+        document = service.documents().get(documentId=DOCUMENT_ID).execute()
+        # print(document)
+        print('The title of the document is: {}'.format(document.get('title')))
+        # print('The body of the document is: {}'.format(document['body']['content']))
+        for s in document['body']['content']:
+            if 'paragraph' in s.keys():# and 'textrun' in s['paragraph']['elements'][0].keys():
+                x = s['paragraph']['elements'][0]['textRun']['content']
+                if x.startswith('\n'):
+                    continue
+                print(x)
+                print(s)
+            else:
+                x = None
+            # print(s)
+            print("----")
+    except HttpError as err:
+        print(err)
+
+if __name__ == '__main__':
+    main()
+```
+
+The output is as follows:
+
+```python
+The title of the document is: Codellab Ally Testing page…
+
+The text is:  I love EECS
+
+The text element is:
+{'startIndex': 1, 'endIndex': 13, 'paragraph': {'elements': [{'startIndex': 1, 'endIndex': 13, 'textRun': {'content': 'I love EECS\n', 'textStyle': {}}}], 'paragraphStyle': {'namedStyleType': 'NORMAL_TEXT', 'direction': 'LEFT_TO_RIGHT'}}}
+
+The text is:  Human AI Lab
+
+The text element is:
+{'startIndex': 17, 'endIndex': 30, 'paragraph': {'elements': [{'startIndex': 17, 'endIndex': 30, 'textRun': {'content': 'Human AI Lab\n', 'textStyle': {}}}], 'paragraphStyle': {'namedStyleType': 'NORMAL_TEXT', 'direction': 'LEFT_TO_RIGHT'}}}
+
+The text is:  Let’s coding
+
+The text element is:
+{'startIndex': 33, 'endIndex': 46, 'paragraph': {'elements': [{'startIndex': 33, 'endIndex': 46, 'textRun': {'content': 'Let’s coding\n', 'textStyle': {}}}], 'paragraphStyle': {'namedStyleType': 'NORMAL_TEXT', 'direction': 'LEFT_TO_RIGHT'}}}
+```
+
+Corresponding page:
+
+![Untitled](CollabAlly%20Project%20Report%2023f505c1b5a646178e3e265be1973d47/Untitled%201.png)
+
+- Right now, the scripts are in python and probably we can embed it in to backend and our extension can use javascript to request the information with Restful API.
+- With the updated texts and position, we can update the specific dictionary in our codes, including docHTMLContextJSON dictionary and docHTMLElementMap.
+- Another solution is to apply google doc api in javascript, but setup is a bit trickier here. But the advantage is that it can greatly reduce latency
+
+### Conclusion
+
+After carefully examining the codes as well as having discussion with project contributors, I found the mainly adjustment we need to carry out is on chrome-extension part, which is mainly developed with javascript. The issue is that the codes can no longer crawl text information in google doc pages since they are now embed into canvas elements. Other part of codes including collaborators, comments still work well since we can still crawl those information. Fortunately, we can use google doc API to access these texts information and then update specific dictionary to make it works. This is really an interesting projects and I feel like the ideas are really novel. It is also very meaningful since it can greatly help blind users to collaborate. I will make every users to make this projects alive and further improve this.
