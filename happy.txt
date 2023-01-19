@@ -1,0 +1,21 @@
+The title of the document is: Codellab Ally Testing page…
+
+
+The text is:  I love EECS
+
+The text element is:
+{'startIndex': 1, 'endIndex': 13, 'paragraph': {'elements': [{'startIndex': 1, 'endIndex': 13, 'textRun': {'content': 'I love EECS\n', 'textStyle': {}}}], 'paragraphStyle': {'namedStyleType': 'NORMAL_TEXT', 'direction': 'LEFT_TO_RIGHT'}}}
+
+
+The text is:  Human AI Lab
+
+The text element is:
+{'startIndex': 17, 'endIndex': 30, 'paragraph': {'elements': [{'startIndex': 17, 'endIndex': 30, 'textRun': {'content': 'Human AI Lab\n', 'textStyle': {}}}], 'paragraphStyle': {'namedStyleType': 'NORMAL_TEXT', 'direction': 'LEFT_TO_RIGHT'}}}
+
+
+The text is:  Let’s coding
+
+The text element is:
+{'startIndex': 33, 'endIndex': 46, 'paragraph': {'elements': [{'startIndex': 33, 'endIndex': 46, 'textRun': {'content': 'Let’s coding\n', 'textStyle': {}}}], 'paragraphStyle': {'namedStyleType': 'NORMAL_TEXT', 'direction': 'LEFT_TO_RIGHT'}}}
+
+
